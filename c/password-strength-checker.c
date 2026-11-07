@@ -1,58 +1,97 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdbool.h>
 #include <ctype.h>
+#include <stdbool.h>
+bool isThereUppercaseF(const char *password)
+{
+    for (int i = 0; i < strlen(password); i++)
+    {
+        if (isupper(password[i]))
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
+bool isThereLowercaseF(const char *password)
+{
+    for (int i = 0; i < strlen(password); i++)
+    {
+        if (islower(password[i]))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isDigitF(const char *password)
+{
+    for (int i = 0; i < strlen(password); i++)
+    {
+        if (isdigit(password[i]))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isSymbolF(const char *password)
+{
+    for (int i = 0; i < strlen(password); i++)
+    {
+        if (ispunct(password[i]))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void check_password(const char *password)
+{
+    bool isMoreThan8Chars = strlen(password) > 8;
+    bool isThereUppercase = isThereUppercaseF(password);
+    bool isThereLowercase = isThereLowercaseF(password);
+    bool isDigit = isDigitF(password);
+    bool isSymbol = isSymbolF(password);
+
+    int score = (int)isMoreThan8Chars + (int)isThereUppercase + (int)isThereLowercase + (int)isDigit + (int)isSymbol;
+    printf("Your Score Is 5/%d\n", score);
+
+    if (score < 5)
+    {
+        if (!isMoreThan8Chars)
+        {
+            printf("The Length Is Not Ok\n");
+        }
+        if (!isThereUppercase)
+        {
+            printf("There Is No Uppercase\n");
+        }
+        if (!isThereLowercase)
+        {
+            printf("There Is No Lowercase\n");
+        }
+        if (!isDigit)
+        {
+            printf("There Is No Digit\n");
+        }
+        if (!isSymbol)
+        {
+            printf("There Is No Symbol\n");
+        }
+    }
+}
 int main()
 {
     char password[100];
-
-    while (true)
+    printf("Type a Password to check\n");
+    fgets(password, strlen(password), stdin);
+    if (scanf("%99s", password) == 1)
     {
-        printf("\nEnter password: ");
-        fgets(password, sizeof(password), stdin);
-
-        password[strcspn(password, "\n")] = 0;
-
-        bool isMoreThan8Chars = strlen(password) > 8;
-        bool isThereUppercase = false;
-        bool isThereLowercase = false;
-        bool isDigit = false;
-        bool isSymbol = false;
-
-        // 2. الفحص داخل النص
-        for (int i = 0; password[i] != '\0'; i++)
-        {
-            if (isupper(password[i]))
-                isThereUppercase = true;
-            else if (islower(password[i]))
-                isThereLowercase = true;
-            else if (isdigit(password[i]))
-                isDigit = true;
-            else
-                isSymbol = true;
-        }
-
-        int score = isMoreThan8Chars + isThereUppercase + isThereLowercase + isDigit + isSymbol;
-
-        if (score == 5)
-        {
-            printf("Strong Password! Score: 5/5\n");
-            break;
-        }
-
-        printf("Score: %d/5\nMissing criteria:\n", score);
-        if (!isMoreThan8Chars)
-            printf("- Must be more than 8 characters\n");
-        if (!isThereUppercase)
-            printf("- Add uppercase letters (A-Z)\n");
-        if (!isThereLowercase)
-            printf("- Add lowercase letters (a-z)\n");
-        if (!isDigit)
-            printf("- Add digits (0-9)\n");
-        if (!isSymbol)
-            printf("- Add symbols (!@#$%%...)\n");
+        check_password(password);
     }
-
-    return 0;
 }
