@@ -89,7 +89,6 @@ int main()
 {
     char password[100];
     printf("Type a Password to check\n");
-    fgets(password, strlen(password), stdin);
     if (scanf("%99s", password) == 1)
     {
         check_password(password);
