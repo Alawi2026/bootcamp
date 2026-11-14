@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>أداة التفاعل مع DOM والوقاية من XSS</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --primary: #2457a6;
+      --danger: #b42318;
+      --success: #067647;
+      --border: #d7deea;
+      --surface: #f5f7fb;
+      --text: #182230;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 28px 16px;
+      background: var(--surface);
+      color: var(--text);
+      font-family: Tahoma, Arial, sans-serif;
+      line-height: 1.7;
+    }
+    .container {
+      width: min(850px, 100%);
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 28px rgba(20, 40, 80, .07);
+    }
+    h1 { margin: 0 0 8px; font-size: 1.55rem; color: #173b70; }
+    .intro { margin: 0 0 22px; color: #475467; }
+    label { display: block; font-weight: 700; margin-bottom: 8px; }
+    textarea {
+      display: block;
+      width: 100%;
+      min-height: 115px;
+      resize: vertical;
+      border: 1px solid #aebbd0;
+      border-radius: 10px;
+      padding: 12px;
+      font: 15px/1.6 Consolas, monospace;
+      direction: ltr;
+      text-align: left;
+    }
+    textarea:focus { outline: 3px solid rgba(36,87,166,.15); border-color: var(--primary); }
+    .buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 20px; }
+    button {
+      border: 0;
+      border-radius: 9px;
+      padding: 10px 16px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:focus-visible { outline: 3px solid #98b8ef; outline-offset: 2px; }
+    .unsafe { background: var(--danger); }
+    .safe { background: var(--success); }
+    .sample { background: var(--primary); }
+    .clear { background: #475467; }
+    .warning {
+      border-right: 4px solid #d92d20;
+      background: #fff4f2;
+      padding: 10px 13px;
+      border-radius: 8px;
+      margin: 18px 0;
+      color: #7a271a;
+    }
+    .results { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .panel { border: 1px solid var(--border); border-radius: 11px; overflow: hidden; min-width: 0; }
+    .panel h2 { font-size: 1rem; margin: 0; padding: 10px 13px; background: #f0f3f8; }
+    .panel.unsafe-panel h2 { color: var(--danger); }
+    .panel.safe-panel h2 { color: var(--success); }
+    .output {
+      min-height: 115px;
+      padding: 13px;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      direction: auto;
+    }
+    .placeholder { color: #667085; }
+    .status { font-size: .9rem; margin: 10px 0 0; color: #475467; }
+    code { direction: ltr; display: inline-block; }
+    @media (max-width: 650px) {
+      .container { padding: 18px; }
+      .results { grid-template-columns: 1fr; }
+      h1 { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>أداة التفاعل مع DOM والوقاية من DOM-Based XSS</h1>
+    <p class="intro">
+      أدخل نصًا ثم قارِن بين إدراجه بطريقة غير آمنة باستخدام
+      <code>innerHTML</code> وإدراجه كنص عادي باستخدام <code>textContent</code>.
+    </p>
+
+    <label for="userInput">مدخل المستخدم</label>
+    <textarea id="userInput" spellcheck="false" placeholder="اكتب نصًا أو جرّب الحمولة التعليمية..."></textarea>
+
+    <div class="buttons">
+      <button type="button" class="unsafe" id="unsafeButton">عرض غير آمن (innerHTML)</button>
+      <button type="button" class="safe" id="safeButton">عرض آمن (textContent)</button>
+      <button type="button" class="sample" id="sampleButton">إدراج حمولة اختبار</button>
+      <button type="button" class="clear" id="clearButton">مسح النتائج</button>
+    </div>
+
+    <div class="warning">
+      <strong>تنبيه تعليمي:</strong>
+      زر العرض غير الآمن يحتوي عمدًا على ثغرة لتوضيح الفكرة. استخدمه محليًا مع مدخلات اختبار فقط،
+      ولا تستخدم هذا الأسلوب في تطبيق حقيقي أو مع بيانات أشخاص آخرين.
+    </div>
+
+    <section class="results" aria-label="نتائج المقارنة">
+      <article class="panel unsafe-panel">
+        <h2>النتيجة غير الآمنة</h2>
+        <div id="unsafeOutput" class="output placeholder" aria-live="polite">ستظهر النتيجة هنا عند الضغط على زر العرض غير الآمن.</div>
+      </article>
+      <article class="panel safe-panel">
+        <h2>النتيجة الآمنة</h2>
+        <div id="safeOutput" class="output placeholder" aria-live="polite">ستظهر النتيجة هنا عند الضغط على زر العرض الآمن.</div>
+      </article>
+    </section>
+
+    <p id="status" class="status" aria-live="polite">جاهز للاختبار.</p>
+  </main>
+
+  <script>
+    "use strict";
+
+    const input = document.getElementById("userInput");
+    const unsafeOutput = document.getElementById("unsafeOutput");
+    const safeOutput = document.getElementById("safeOutput");
+    const status = document.getElementById("status");
+
+    function showUnsafe() {
+      const userValue = input.value;
+      unsafeOutput.classList.remove("placeholder");
+      unsafeOutput.innerHTML = userValue;
+      status.textContent = "تم إدراج المدخل باستخدام innerHTML. قد تُفسَّر وسوم HTML وتُنفَّذ معالجات الأحداث.";
+    }
+
+
+    function showSafe() {
+      const userValue = input.value;
+      safeOutput.replaceChildren();
+
+      const resultLabel = document.createElement("p");
+      resultLabel.textContent = "النص الذي أدخلته (معروض كنص عادي):";
+      resultLabel.style.fontWeight = "700";
+
+      const resultText = document.createElement("p");
+      resultText.textContent = userValue;
+
+      safeOutput.appendChild(resultLabel);
+      safeOutput.appendChild(resultText);
+      safeOutput.classList.remove("placeholder");
+      status.textContent = "تم عرض المدخل باستخدام textContent؛ لذلك لن يُفسَّر كوسوم HTML أو كود.";
+    }
+
+    function loadPayload() {
+      input.value = '<img src=x onerror=alert(1)>';
+      status.textContent = "تم إدراج حمولة الاختبار. جرّب الزرين لمقارنة النتيجتين.";
+      input.focus();
+    }
+
+    function clearResults() {
+      input.value = "";
+      unsafeOutput.replaceChildren();
+      safeOutput.replaceChildren();
+      unsafeOutput.textContent = "ستظهر النتيجة هنا عند الضغط على زر العرض غير الآمن.";
+      safeOutput.textContent = "ستظهر النتيجة هنا عند الضغط على زر العرض الآمن.";
+      unsafeOutput.classList.add("placeholder");
+      safeOutput.classList.add("placeholder");
+      status.textContent = "تم مسح المدخلات والنتائج.";
+    }
+
+    document.getElementById("unsafeButton").addEventListener("click", showUnsafe);
+    document.getElementById("safeButton").addEventListener("click", showSafe);
+    document.getElementById("sampleButton").addEventListener("click", loadPayload);
+    document.getElementById("clearButton").addEventListener("click", clearResults);
+  </script>
+</body>
+</html>
